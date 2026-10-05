@@ -80,13 +80,34 @@ public class ArabicIntentResolver {
             return new VehicleIntent.Media(action);
         }
 
-        // 7. Dynamic App Launch Intent (e.g. "افتح تطبيق يوتيوب", "افتح يوتيوب", "شغل تطبيق سبوتيفاي", "افتح الاعدادات")
+        // 7. Check for App Updates Intent (e.g. "فحص التحديثات", "تحديث التطبيق", "شيك على التحديثات")
+        if (matchesUpdate(text)) {
+            return new VehicleIntent.OpenApp("تحديث");
+        }
+
+        // 8. Dynamic App Launch Intent (e.g. "افتح تطبيق يوتيوب", "افتح يوتيوب", "شغل تطبيق سبوتيفاي", "افتح الاعدادات")
         VehicleIntent.OpenApp openApp = extractOpenApp(text);
         if (openApp != null) {
             return openApp;
         }
 
         return new VehicleIntent.Unknown(spokenText);
+    }
+
+    private boolean matchesUpdate(String t) {
+        if (t.contains("فحص التحديثات") || t.contains("فحص تحديث") ||
+            t.contains("تحديث التطبيق") || t.contains("تحديث البرنامج") ||
+            t.contains("تحديث النظام") || t.contains("حدث التطبيق") ||
+            t.contains("حدث البرنامج")) {
+            return true;
+        }
+        if ((t.contains("شيك") || t.contains("جيك") || t.contains("ابحث")) && t.contains("تحديث")) {
+            return true;
+        }
+        if (t.equals("تحديث") || t.equals("التحديثات")) {
+            return true;
+        }
+        return false;
     }
 
     private VehicleIntent.OpenApp extractOpenApp(String t) {
