@@ -3,8 +3,6 @@ name: Build BYD Assistant APK
 on:
   push:
     branches: [ master, main ]
-  pull_request:
-    branches: [ master, main ]
   workflow_dispatch:
 
 jobs:
@@ -21,8 +19,10 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.2'
 
     - name: Build APK with Gradle
       run: |
@@ -31,5 +31,5 @@ jobs:
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: BydArabicAssistant-Debug-APK
+        name: BydArabicAssistant-APK
         path: app/build/outputs/apk/debug/*.apk
