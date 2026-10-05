@@ -11,6 +11,7 @@ public class ArabicTtsEngineTest {
         testVocalizedWindow(engine);
         testVocalizedVolumeAndMedia(engine);
         testVocalizedNavigation(engine);
+        testVocalizedOpenApp(engine);
         testVocalizedUnknown(engine);
 
         System.out.println("ALL_TTS_TESTS_PASSED");
@@ -91,6 +92,20 @@ public class ArabicTtsEngineTest {
             throw new AssertionError("Failed Navigation: " + resNav);
         }
         assertHasTashkeel(resNav);
+    }
+
+    private static void testVocalizedOpenApp(ArabicTtsEngine engine) {
+        String resApp = engine.getVocalizedResponse(new VehicleIntent.OpenApp("يوتيوب"));
+        if (!resApp.equals("تَمَّ فَتْحُ تَطْبِيقِ يوتيوب.")) {
+            throw new AssertionError("Failed OpenApp: " + resApp);
+        }
+        assertHasTashkeel(resApp);
+
+        String resSettings = engine.getVocalizedResponse(new VehicleIntent.OpenApp("الاعدادات"));
+        if (!resSettings.equals("تَمَّ فَتْحُ الإِعْدَادَاتِ.")) {
+            throw new AssertionError("Failed OpenApp Settings: " + resSettings);
+        }
+        assertHasTashkeel(resSettings);
     }
 
     private static void testVocalizedUnknown(ArabicTtsEngine engine) {

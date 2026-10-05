@@ -75,7 +75,7 @@ public class BydVehicleController {
             Method getInstalledApplications = pmClass.getMethod("getInstalledApplications", int.class);
             java.util.List<?> apps = (java.util.List<?>) getInstalledApplications.invoke(pm, 0);
 
-            String cleanTarget = targetName.toLowerCase().trim();
+            java.util.List<String> keywords = getAppSearchKeywords(targetName);
 
             for (Object appInfo : apps) {
                 Method loadLabel = appInfo.getClass().getMethod("loadLabel", pmClass);
@@ -85,7 +85,15 @@ public class BydVehicleController {
                 java.lang.reflect.Field pkgField = appInfo.getClass().getField("packageName");
                 String pkgName = (String) pkgField.get(appInfo);
 
-                if (labelStr.contains(cleanTarget) || pkgName.toLowerCase().contains(cleanTarget)) {
+                boolean matches = false;
+                for (String kw : keywords) {
+                    if (labelStr.contains(kw) || pkgName.toLowerCase().contains(kw)) {
+                        matches = true;
+                        break;
+                    }
+                }
+
+                if (matches) {
                     Method getLaunchIntent = pmClass.getMethod("getLaunchIntentForPackage", String.class);
                     Object launchIntent = getLaunchIntent.invoke(pm, pkgName);
                     if (launchIntent != null) {
@@ -101,6 +109,27 @@ public class BydVehicleController {
         } catch (Throwable e) {
             return false;
         }
+    }
+
+    private java.util.List<String> getAppSearchKeywords(String targetName) {
+        java.util.List<String> keywords = new java.util.ArrayList<>();
+        String clean = targetName.toLowerCase().trim();
+        keywords.add(clean);
+
+        if (clean.contains("يوتيوب")) keywords.add("youtube");
+        if (clean.contains("سبوتيفاي")) keywords.add("spotify");
+        if (clean.contains("نتفلكس") || clean.contains("نتفليكس")) keywords.add("netflix");
+        if (clean.contains("تيك توك")) keywords.add("tiktok");
+        if (clean.contains("واتساب") || clean.contains("واتس")) keywords.add("whatsapp");
+        if (clean.contains("انغامي") || clean.contains("أنغامي")) keywords.add("anghami");
+        if (clean.contains("ويز") || clean.contains("وايز")) keywords.add("waze");
+        if (clean.contains("تليجرام") || clean.contains("تيليجرام")) keywords.add("telegram");
+        if (clean.contains("كروم") || clean.contains("متصفح")) { keywords.add("chrome"); keywords.add("browser"); }
+        if (clean.contains("كاميرا") || clean.contains("كاميرات")) { keywords.add("camera"); keywords.add("avm"); }
+        if (clean.contains("راديو")) keywords.add("radio");
+        if (clean.contains("موسيقى") || clean.contains("اغاني")) keywords.add("music");
+
+        return keywords;
     }
 
     public boolean rotateScreen(ScreenOrientation orientation) {
