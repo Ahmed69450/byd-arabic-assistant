@@ -12,6 +12,7 @@ public class ArabicIntentResolverTest {
         testVolumeCommands(resolver);
         testNavigationCommands(resolver);
         testMediaCommands(resolver);
+        testOpenAppCommands(resolver);
         testUnknownCommands(resolver);
 
         System.out.println("ALL_INTENT_TESTS_PASSED");
@@ -106,6 +107,28 @@ public class ArabicIntentResolverTest {
         VehicleIntent r1 = resolver.resolve("شغل الاغنية التالية");
         if (!(r1 instanceof VehicleIntent.Media && ((VehicleIntent.Media) r1).action == MediaAction.NEXT)) {
             throw new AssertionError("Failed: شغل الاغنية التالية -> " + r1);
+        }
+    }
+
+    private static void testOpenAppCommands(ArabicIntentResolver resolver) {
+        VehicleIntent r1 = resolver.resolve("افتح تطبيق يوتيوب");
+        if (!(r1 instanceof VehicleIntent.OpenApp && ((VehicleIntent.OpenApp) r1).appName.contains("يوتيوب"))) {
+            throw new AssertionError("Failed: افتح تطبيق يوتيوب -> " + r1);
+        }
+
+        VehicleIntent r2 = resolver.resolve("شغل تطبيق سبوتيفاي فدوه");
+        if (!(r2 instanceof VehicleIntent.OpenApp && ((VehicleIntent.OpenApp) r2).appName.contains("سبوتيفاي"))) {
+            throw new AssertionError("Failed: شغل تطبيق سبوتيفاي -> " + r2);
+        }
+
+        VehicleIntent r3 = resolver.resolve("افتح الاعدادات");
+        if (!(r3 instanceof VehicleIntent.OpenApp && ((VehicleIntent.OpenApp) r3).appName.equals("الاعدادات"))) {
+            throw new AssertionError("Failed: افتح الاعدادات -> " + r3);
+        }
+
+        VehicleIntent r4 = resolver.resolve("افتح الضبط");
+        if (!(r4 instanceof VehicleIntent.OpenApp && ((VehicleIntent.OpenApp) r4).appName.equals("الاعدادات"))) {
+            throw new AssertionError("Failed: افتح الضبط -> " + r4);
         }
     }
 

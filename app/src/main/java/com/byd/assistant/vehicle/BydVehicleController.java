@@ -39,9 +39,68 @@ public class BydVehicleController {
             return launchNavigation(((VehicleIntent.Navigation) intent).destination);
         } else if (intent instanceof VehicleIntent.Media) {
             return controlMedia(((VehicleIntent.Media) intent).action);
+        } else if (intent instanceof VehicleIntent.OpenApp) {
+            return launchApplication(((VehicleIntent.OpenApp) intent).appName);
         }
 
         return false;
+    }
+
+    public boolean launchApplication(String targetName) {
+        if (isMockMode || androidContext == null) {
+            return true;
+        }
+
+        try {
+            Class<?> contextClass = Class.forName("android.content.Context");
+
+            // Check if settings
+            if (targetName.contains("اعدادات") || targetName.contains("ضبط") || targetName.equalsIgnoreCase("settings")) {
+                Class<?> intentClass = Class.forName("android.content.Intent");
+                Class<?> settingsClass = Class.forName("android.provider.Settings");
+                String action = (String) settingsClass.getField("ACTION_SETTINGS").get(null);
+                Object intent = intentClass.getConstructor(String.class).newInstance(action);
+                Method addFlags = intentClass.getMethod("addFlags", int.class);
+                addFlags.invoke(intent, 0x10000000); // FLAG_ACTIVITY_NEW_TASK
+                Method startActivity = contextClass.getMethod("startActivity", intentClass);
+                startActivity.invoke(androidContext, intent);
+                return true;
+            }
+
+            // PackageManager dynamic search
+            Method getPackageManager = contextClass.getMethod("getPackageManager");
+            Object pm = getPackageManager.invoke(androidContext);
+            Class<?> pmClass = pm.getClass();
+
+            Method getInstalledApplications = pmClass.getMethod("getInstalledApplications", int.class);
+            java.util.List<?> apps = (java.util.List<?>) getInstalledApplications.invoke(pm, 0);
+
+            String cleanTarget = targetName.toLowerCase().trim();
+
+            for (Object appInfo : apps) {
+                Method loadLabel = appInfo.getClass().getMethod("loadLabel", pmClass);
+                CharSequence label = (CharSequence) loadLabel.invoke(appInfo, pm);
+                String labelStr = (label != null) ? label.toString().toLowerCase() : "";
+
+                java.lang.reflect.Field pkgField = appInfo.getClass().getField("packageName");
+                String pkgName = (String) pkgField.get(appInfo);
+
+                if (labelStr.contains(cleanTarget) || pkgName.toLowerCase().contains(cleanTarget)) {
+                    Method getLaunchIntent = pmClass.getMethod("getLaunchIntentForPackage", String.class);
+                    Object launchIntent = getLaunchIntent.invoke(pm, pkgName);
+                    if (launchIntent != null) {
+                        Method addFlags = launchIntent.getClass().getMethod("addFlags", int.class);
+                        addFlags.invoke(launchIntent, 0x10000000);
+                        Method startActivity = contextClass.getMethod("startActivity", launchIntent.getClass());
+                        startActivity.invoke(androidContext, launchIntent);
+                        return true;
+                    }
+                }
+            }
+            return false;
+        } catch (Throwable e) {
+            return false;
+        }
     }
 
     public boolean rotateScreen(ScreenOrientation orientation) {

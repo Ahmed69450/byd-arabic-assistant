@@ -80,7 +80,42 @@ public class ArabicIntentResolver {
             return new VehicleIntent.Media(action);
         }
 
+        // 7. Dynamic App Launch Intent (e.g. "افتح تطبيق يوتيوب", "افتح يوتيوب", "شغل تطبيق سبوتيفاي", "افتح الاعدادات")
+        VehicleIntent.OpenApp openApp = extractOpenApp(text);
+        if (openApp != null) {
+            return openApp;
+        }
+
         return new VehicleIntent.Unknown(spokenText);
+    }
+
+    private VehicleIntent.OpenApp extractOpenApp(String t) {
+        String appName = null;
+
+        // Explicit "تطبيق" or "برنامج"
+        if (t.contains("تطبيق ")) {
+            appName = t.substring(t.indexOf("تطبيق ") + 6).trim();
+        } else if (t.contains("برنامج ")) {
+            appName = t.substring(t.indexOf("برنامج ") + 7).trim();
+        } else if (t.startsWith("افتح ")) {
+            appName = t.substring(5).trim();
+        } else if (t.startsWith("شغل ")) {
+            appName = t.substring(4).trim();
+        }
+
+        if (appName == null || appName.isEmpty()) {
+            return null;
+        }
+
+        // Clean trailing fillers
+        appName = appName.replaceAll("\\b(فدوه|هسه|هسة|لو سمحت|من فضلك|ارجوك)\\b", "").trim();
+        if (appName.isEmpty()) return null;
+
+        if (appName.equals("الضبط") || appName.equals("ضبط") || appName.equals("الاعدادات") || appName.equals("اعدادات")) {
+            appName = "الاعدادات";
+        }
+
+        return new VehicleIntent.OpenApp(appName);
     }
 
     private boolean isNegativeOrOff(String t) {

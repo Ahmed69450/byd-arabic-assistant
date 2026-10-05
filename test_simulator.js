@@ -87,6 +87,19 @@ function resolveIntent(rawText) {
         return { type: 'MEDIA', action };
     }
 
+    // 7. Dynamic App Launch
+    if (text.includes('تطبيق ') || text.includes('برنامج ') || text.startsWith('افتح ') || text.startsWith('شغل ')) {
+        let app = '';
+        if (text.includes('تطبيق ')) app = text.split('تطبيق ')[1].trim();
+        else if (text.includes('برنامج ')) app = text.split('برنامج ')[1].trim();
+        else if (text.startsWith('افتح ')) app = text.substring(5).trim();
+        else if (text.startsWith('شغل ')) app = text.substring(4).trim();
+
+        app = app.replace(/\b(فدوه|هسه|هسة|لو سمحت|من فضلك)\b/g, '').trim();
+        if (app === 'الضبط' || app === 'ضبط' || app === 'الاعدادات' || app === 'اعدادات') app = 'الاعدادات';
+        if (app) return { type: 'OPEN_APP', appName: app };
+    }
+
     return { type: 'UNKNOWN', raw: rawText };
 }
 
@@ -116,6 +129,9 @@ function getVocalizedFeedback(intent) {
             if (intent.action === 'PREVIOUS') return 'تَمَّ الِانْتِقَالُ إِلَى المَقْطَعِ السَّابِقِ.';
             if (intent.action === 'PAUSE') return 'تَمَّ إِيقَافُ الصَّوْتِيَّاتِ.';
             return 'تَمَّ تَشْغِيلُ الصَّوْتِيَّاتِ.';
+        case 'OPEN_APP':
+            if (intent.appName === 'الاعدادات' || intent.appName === 'ضبط') return 'تَمَّ فَتْحُ الإِعْدَادَاتِ.';
+            return `تَمَّ فَتْحُ تَطْبِيقِ ${intent.appName}.`;
         default:
             return 'عَفْوًا، لَمْ أَفْهَمِ الأَمْرَ. يُرْجَى الإِعَادَةُ.';
     }
@@ -144,6 +160,10 @@ const testCases = [
     "اكتم الصوت",
     "افتح الخرايط",
     "شغل الاغنية التالية",
+    "افتح تطبيق يوتيوب",
+    "شغل تطبيق سبوتيفاي",
+    "افتح الاعدادات",
+    "افتح الضبط",
     "أوقف التكييف",
     "أدر الشاشة",
     "افتح النوافذ",

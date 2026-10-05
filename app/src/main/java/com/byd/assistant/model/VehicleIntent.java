@@ -108,6 +108,19 @@ public abstract class VehicleIntent {
         }
     }
 
+    public static final class OpenApp extends VehicleIntent {
+        public final String appName;
+
+        public OpenApp(String appName) {
+            this.appName = appName;
+        }
+
+        @Override
+        public String toString() {
+            return "OpenApp{'" + appName + "'}";
+        }
+    }
+
     public static final class Unknown extends VehicleIntent {
         public final String originalText;
 

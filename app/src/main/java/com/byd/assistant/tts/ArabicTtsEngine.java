@@ -74,6 +74,14 @@ public class ArabicTtsEngine {
             }
         }
 
+        if (intent instanceof VehicleIntent.OpenApp) {
+            String app = ((VehicleIntent.OpenApp) intent).appName;
+            if (app.contains("اعدادات") || app.contains("ضبط")) {
+                return "تَمَّ فَتْحُ الإِعْدَادَاتِ.";
+            }
+            return "تَمَّ فَتْحُ تَطْبِيقِ " + app + ".";
+        }
+
         return "عَفْوًا، لَمْ أَفْهَمِ الأَمْرَ. يُرْجَى الإِعَادَةُ.";
     }
 
