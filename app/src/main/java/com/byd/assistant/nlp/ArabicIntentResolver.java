@@ -88,7 +88,7 @@ public class ArabicIntentResolver {
     }
 
     private boolean matchesClimate(String t) {
-        return t.contains("تبريد") || t.contains("مكيف") || t.contains("حراره") || t.contains("بروده") || t.contains("تدفئه") || t.contains("سبلت");
+        return t.contains("تبريد") || t.contains("مكيف") || t.contains("تكييف") || t.contains("حراره") || t.contains("بروده") || t.contains("تدفئه") || t.contains("سبلت");
     }
 
     private boolean matchesWindow(String t) {
@@ -98,7 +98,8 @@ public class ArabicIntentResolver {
     private boolean matchesScreenRotate(String t) {
         boolean hasScreenWord = t.contains("شاشه") || t.contains("شاشة");
         boolean hasRotateOrOrientation = t.contains("فر") || t.contains("دور") || t.contains("اقلب")
-                || t.contains("حول") || t.contains("لف") || t.contains("طول") || t.contains("عرض")
+                || t.contains("حول") || t.contains("لف") || t.contains("ادر") || t.contains("اداره")
+                || t.contains("طول") || t.contains("عرض")
                 || t.contains("راسي") || t.contains("عمودي") || t.contains("افقي");
         return hasScreenWord && hasRotateOrOrientation;
     }
