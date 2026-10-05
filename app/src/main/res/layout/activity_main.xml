@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0F172A"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp"
+        android:gravity="center_horizontal">
+
+        <!-- Car & App Header -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="مساعد BYD الصوتي الذكي (دستروير 2025)"
+            android:textColor="#38BDF8"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"
+            android:gravity="center" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="يدعم اللهجة العراقية والعربية الفصحى مع ردود فصيحة مشكولة"
+            android:textColor="#94A3B8"
+            android:textSize="14sp"
+            android:layout_marginTop="8dp"
+            android:gravity="center" />
+
+        <!-- Status Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#1E293B"
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:layout_marginTop="24dp"
+            android:gravity="center">
+
+            <TextView
+                android:id="@+id/tv_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="الحالة: المساعد جاهز للتشغيل"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/btn_toggle_service"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_marginTop="16dp"
+                android:background="#0284C7"
+                android:text="تشغيل المساعد الصوتي لسيارة BYD"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Command Guide / Cheat Sheet -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="قائمة الأوامر الصوتية المدعومة:"
+            android:textColor="#F8FAFC"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginTop="28dp" />
+
+        <!-- Cards for commands -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="❄️ التكييف: 'شغل التبريد'، 'شعل المكيف وسوي الحرارة 22'، 'طفي التبريد'، 'برد السيارة'"
+            android:textColor="#E2E8F0"
+            android:textSize="15sp"
+            android:padding="12dp"
+            android:background="#1E293B"
+            android:layout_marginTop="10dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🪟 النوافذ: 'نزل الجامة'، 'صعد الجامات كلها'، 'افتح النوافذ'، 'سد الشبابيك'"
+            android:textColor="#E2E8F0"
+            android:textSize="15sp"
+            android:padding="12dp"
+            android:background="#1E293B"
+            android:layout_marginTop="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🔄 الشاشة: 'فر الشاشة'، 'دور الشاشة'، 'سوي الشاشة بالطول'، 'اقلب الشاشة بالعرض'"
+            android:textColor="#E2E8F0"
+            android:textSize="15sp"
+            android:padding="12dp"
+            android:background="#1E293B"
+            android:layout_marginTop="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🔊 الصوتيات: 'علي الصوت'، 'نصي الصوت'، 'اكتم الصوت'، 'الاغنية التالية'، 'وقف الموسيقى'"
+            android:textColor="#E2E8F0"
+            android:textSize="15sp"
+            android:padding="12dp"
+            android:background="#1E293B"
+            android:layout_marginTop="8dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🗺️ الملاحة: 'افتح الخرايط'، 'شغل الملاحة'"
+            android:textColor="#E2E8F0"
+            android:textSize="15sp"
+            android:padding="12dp"
+            android:background="#1E293B"
+            android:layout_marginTop="8dp" />
+
+    </LinearLayout>
+</ScrollView>
