@@ -114,9 +114,8 @@ public class AssistantForegroundService extends Service implements FloatingAssis
 
         Intent recognizerIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ar-IQ");
-        recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ar-IQ");
-        recognizerIntent.putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, "ar-IQ");
+        recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ar");
+        recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ar");
         recognizerIntent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
 
         mainHandler.post(() -> {
@@ -207,6 +206,11 @@ public class AssistantForegroundService extends Service implements FloatingAssis
                             case SpeechRecognizer.ERROR_NETWORK_TIMEOUT:
                                 errorMsg = "يرجى التأكد من اتصال الإنترنت للتعرف على الصوت";
                                 break;
+                            case 12: // ERROR_LANGUAGE_NOT_SUPPORTED
+                            case 13: // ERROR_LANGUAGE_UNAVAILABLE
+                                errorMsg = "حزمة لغة الصوت غير مثبتة محلياً، جاري التبديل للمحرك الافتراضي...";
+                                retryDefaultLocale();
+                                return;
                             default:
                                 errorMsg = "تعذر التعرف على الصوت (رمز: " + error + ")";
                                 break;
@@ -228,6 +232,26 @@ public class AssistantForegroundService extends Service implements FloatingAssis
                 });
             } catch (Exception e) {
                 Toast.makeText(AssistantForegroundService.this, "خدمة التعرف على الصوت غير مفعلة في النظام", Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    private void retryDefaultLocale() {
+        mainHandler.post(() -> {
+            try {
+                if (speechRecognizer == null) return;
+                Toast.makeText(AssistantForegroundService.this, "أستمع باللغة الافتراضية...", Toast.LENGTH_SHORT).show();
+                if (floatingView != null) floatingView.setState(FloatingAssistantView.State.LISTENING);
+                isListening = true;
+
+                Intent fallbackIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+                fallbackIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+                fallbackIntent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3);
+                speechRecognizer.startListening(fallbackIntent);
+            } catch (Exception e) {
+                if (floatingView != null) floatingView.setState(FloatingAssistantView.State.IDLE);
+                isListening = false;
+                abandonAudioFocus();
             }
         });
     }
