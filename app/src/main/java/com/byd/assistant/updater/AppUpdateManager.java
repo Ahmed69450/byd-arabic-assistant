@@ -15,11 +15,15 @@ public class AppUpdateManager {
 
     public interface UpdateCallback {
         void onUpdateAvailable(String latestVersion, String downloadUrl, String releaseNotes);
-        void onNoUpdateAvailable();
-        void onError(String message);
+        void onUpToDate(String currentVersion);
+        void onError(String errorMessage);
     }
 
-    public void checkForUpdates(Object context, UpdateCallback callback) {
+    public static String getInstalledVersion(Object context) {
+        return getCurrentVersionName(context);
+    }
+
+    public static void checkForUpdates(Object context, UpdateCallback callback) {
         new Thread(() -> {
             try {
                 URL url = new URL(GITHUB_API_URL);
@@ -69,7 +73,8 @@ public class AppUpdateManager {
                     final String fNotes = releaseBody;
                     postToMain(() -> callback.onUpdateAvailable(fTag, fUrl, fNotes));
                 } else {
-                    postToMain(callback::onNoUpdateAvailable);
+                    final String fCurr = currentVersion;
+                    postToMain(() -> callback.onUpToDate(fCurr));
                 }
 
             } catch (Exception e) {
@@ -78,7 +83,7 @@ public class AppUpdateManager {
         }).start();
     }
 
-    public void downloadAndInstall(Object context, String downloadUrl) {
+    public static void downloadAndInstall(Object context, String downloadUrl) {
         if (context == null) return;
         try {
             Class<?> contextClass = Class.forName("android.content.Context");
@@ -86,7 +91,7 @@ public class AppUpdateManager {
             Method parseUri = uriClass.getMethod("parse", String.class);
             Object uriObj = parseUri.invoke(null, downloadUrl);
 
-            // Open download url directly via browser or download intent
+            // Open download url directly via browser / download intent
             Class<?> intentClass = Class.forName("android.content.Intent");
             Object intent = intentClass.getConstructor(String.class, uriClass).newInstance("android.intent.action.VIEW", uriObj);
             Method addFlags = intentClass.getMethod("addFlags", int.class);
@@ -99,11 +104,11 @@ public class AppUpdateManager {
         }
     }
 
-    private void postError(UpdateCallback callback, String msg) {
+    private static void postError(UpdateCallback callback, String msg) {
         postToMain(() -> callback.onError(msg));
     }
 
-    private void postToMain(Runnable r) {
+    private static void postToMain(Runnable r) {
         try {
             Class<?> looperClass = Class.forName("android.os.Looper");
             Method getMainLooper = looperClass.getMethod("getMainLooper");
@@ -121,7 +126,7 @@ public class AppUpdateManager {
     }
 
     public static String getCurrentVersionName(Object context) {
-        if (context == null) return "1.0.0";
+        if (context == null) return "1.1.0";
         try {
             Class<?> contextClass = Class.forName("android.content.Context");
             Method getPackageManager = contextClass.getMethod("getPackageManager");
@@ -136,7 +141,7 @@ public class AppUpdateManager {
             Field versionNameField = pInfo.getClass().getField("versionName");
             return (String) versionNameField.get(pInfo);
         } catch (Throwable e) {
-            return "1.0.0";
+            return "1.1.0";
         }
     }
 
