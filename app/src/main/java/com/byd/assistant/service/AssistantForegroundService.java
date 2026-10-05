@@ -20,6 +20,9 @@ import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
+import android.content.pm.PackageManager;
+import android.content.pm.ServiceInfo;
+import android.widget.Toast;
 import com.byd.assistant.MainActivity;
 import com.byd.assistant.model.VehicleIntent;
 import com.byd.assistant.nlp.ArabicIntentResolver;
@@ -56,7 +59,12 @@ public class AssistantForegroundService extends Service implements FloatingAssis
         vehicleController = new BydVehicleController(this);
 
         initNotificationChannel();
-        startForeground(NOTIFICATION_ID, buildForegroundNotification());
+        Notification notification = buildForegroundNotification();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
+        } else {
+            startForeground(NOTIFICATION_ID, notification);
+        }
 
         initTts();
         initSpeechRecognizer();
@@ -86,6 +94,14 @@ public class AssistantForegroundService extends Service implements FloatingAssis
     }
 
     private void startListening() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "يرجى منح إذن الميكروفون أولاً من إعدادات التطبيق", Toast.LENGTH_LONG).show();
+                if (floatingView != null) floatingView.setState(FloatingAssistantView.State.IDLE);
+                return;
+            }
+        }
+
         if (speechRecognizer == null) {
             initSpeechRecognizer();
         }
@@ -93,6 +109,8 @@ public class AssistantForegroundService extends Service implements FloatingAssis
         requestAudioFocusDucking();
         floatingView.setState(FloatingAssistantView.State.LISTENING);
         isListening = true;
+
+        Toast.makeText(this, "أستمع إليك الآن... تَحَدَّث", Toast.LENGTH_SHORT).show();
 
         Intent recognizerIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
@@ -152,7 +170,11 @@ public class AssistantForegroundService extends Service implements FloatingAssis
 
     private void initSpeechRecognizer() {
         mainHandler.post(() -> {
-            if (SpeechRecognizer.isRecognitionAvailable(this)) {
+            try {
+                if (speechRecognizer != null) {
+                    try { speechRecognizer.destroy(); } catch (Exception ignored) {}
+                }
+
                 speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
                 speechRecognizer.setRecognitionListener(new RecognitionListener() {
                     @Override public void onReadyForSpeech(Bundle params) {}
@@ -164,8 +186,32 @@ public class AssistantForegroundService extends Service implements FloatingAssis
                     }
                     @Override public void onError(int error) {
                         isListening = false;
-                        floatingView.setState(FloatingAssistantView.State.IDLE);
+                        if (floatingView != null) floatingView.setState(FloatingAssistantView.State.IDLE);
                         abandonAudioFocus();
+
+                        String errorMsg;
+                        switch (error) {
+                            case SpeechRecognizer.ERROR_NO_MATCH:
+                                errorMsg = "لم أسمع أي أمر، يرجى المحاولة ثانية";
+                                break;
+                            case SpeechRecognizer.ERROR_SPEECH_TIMEOUT:
+                                errorMsg = "انتهى الوقت دون تحدث";
+                                break;
+                            case SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS:
+                                errorMsg = "يرجى منح إذن الميكروفون للتطبيق";
+                                break;
+                            case SpeechRecognizer.ERROR_AUDIO:
+                                errorMsg = "خطأ في التقاط الصوت من الميكروفون";
+                                break;
+                            case SpeechRecognizer.ERROR_NETWORK:
+                            case SpeechRecognizer.ERROR_NETWORK_TIMEOUT:
+                                errorMsg = "يرجى التأكد من اتصال الإنترنت للتعرف على الصوت";
+                                break;
+                            default:
+                                errorMsg = "تعذر التعرف على الصوت (رمز: " + error + ")";
+                                break;
+                        }
+                        Toast.makeText(AssistantForegroundService.this, errorMsg, Toast.LENGTH_SHORT).show();
                     }
                     @Override public void onResults(Bundle results) {
                         isListening = false;
@@ -173,13 +219,15 @@ public class AssistantForegroundService extends Service implements FloatingAssis
                         if (matches != null && !matches.isEmpty()) {
                             handleRecognizedSpeech(matches.get(0));
                         } else {
-                            floatingView.setState(FloatingAssistantView.State.IDLE);
+                            if (floatingView != null) floatingView.setState(FloatingAssistantView.State.IDLE);
                             abandonAudioFocus();
                         }
                     }
                     @Override public void onPartialResults(Bundle partialResults) {}
                     @Override public void onEvent(int eventType, Bundle params) {}
                 });
+            } catch (Exception e) {
+                Toast.makeText(AssistantForegroundService.this, "خدمة التعرف على الصوت غير مفعلة في النظام", Toast.LENGTH_LONG).show();
             }
         });
     }

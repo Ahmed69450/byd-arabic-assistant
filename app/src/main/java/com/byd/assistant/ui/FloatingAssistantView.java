@@ -146,7 +146,11 @@ public class FloatingAssistantView extends FrameLayout {
         } catch (Exception ignored) {}
     }
 
+    private long touchDownTime = 0;
+
     private void setupTouchListener() {
+        final int touchSlop = dpToPx(getContext(), 16); // ~40-48px on modern screens
+
         setOnTouchListener((v, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
@@ -154,23 +158,40 @@ public class FloatingAssistantView extends FrameLayout {
                     initialY = layoutParams.y;
                     initialTouchX = event.getRawX();
                     initialTouchY = event.getRawY();
+                    touchDownTime = System.currentTimeMillis();
                     isDragging = false;
+                    buttonContainer.setScaleX(0.92f);
+                    buttonContainer.setScaleY(0.92f);
                     return true;
 
                 case MotionEvent.ACTION_MOVE:
-                    int dx = (int) (event.getRawX() - initialTouchX);
-                    int dy = (int) (event.getRawY() - initialTouchY);
-                    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                    float totalDeltaX = event.getRawX() - initialTouchX;
+                    float totalDeltaY = event.getRawY() - initialTouchY;
+                    double dist = Math.hypot(totalDeltaX, totalDeltaY);
+
+                    if (dist > touchSlop) {
                         isDragging = true;
-                        layoutParams.x = initialX + dx;
-                        layoutParams.y = initialY + dy;
-                        windowManager.updateViewLayout(FloatingAssistantView.this, layoutParams);
+                        layoutParams.x = (int) (initialX + totalDeltaX);
+                        layoutParams.y = (int) (initialY + totalDeltaY);
+                        try {
+                            windowManager.updateViewLayout(FloatingAssistantView.this, layoutParams);
+                        } catch (Exception ignored) {}
                     }
                     return true;
 
                 case MotionEvent.ACTION_UP:
-                    if (!isDragging && clickListener != null) {
-                        clickListener.onMicClicked();
+                case MotionEvent.ACTION_CANCEL:
+                    buttonContainer.setScaleX(1.0f);
+                    buttonContainer.setScaleY(1.0f);
+
+                    long duration = System.currentTimeMillis() - touchDownTime;
+                    double finalDist = Math.hypot(event.getRawX() - initialTouchX, event.getRawY() - initialTouchY);
+
+                    // If user tapped without dragging or moved very little, treat as click
+                    if ((!isDragging || finalDist < touchSlop * 1.5) && duration < 1000) {
+                        if (clickListener != null) {
+                            clickListener.onMicClicked();
+                        }
                     }
                     return true;
             }
