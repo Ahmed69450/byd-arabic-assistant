@@ -1,11 +1,8 @@
 package com.byd.assistant.nlp;
 
 import com.byd.assistant.model.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class ArabicIntentResolver {
-    private static final Pattern TEMP_DIGIT_PATTERN = Pattern.compile("\\b([1-3][0-9])\\b");
 
     public VehicleIntent resolve(String spokenText) {
         if (spokenText == null || spokenText.trim().isEmpty()) {
@@ -39,9 +36,10 @@ public class ArabicIntentResolver {
         if (matchesWindow(text)) {
             boolean open = text.contains("نزل") || text.contains("افتح") || text.contains("هبط");
             WindowTarget target = WindowTarget.ALL;
-            if (text.contains("سائق") || text.contains("سايق")) {
+            String extracted = SlotExtractor.extractTarget(text);
+            if ("DRIVER".equals(extracted)) {
                 target = WindowTarget.DRIVER;
-            } else if (text.contains("راكب") || text.contains("صفحي")) {
+            } else if ("PASSENGER".equals(extracted)) {
                 target = WindowTarget.PASSENGER;
             }
             return new VehicleIntent.Window(open, target);
@@ -176,18 +174,10 @@ public class ArabicIntentResolver {
     }
 
     private Integer extractTemperature(String t) {
-        Matcher matcher = TEMP_DIGIT_PATTERN.matcher(t);
-        if (matcher.find()) {
-            try {
-                return Integer.parseInt(matcher.group(1));
-            } catch (NumberFormatException ignored) {}
+        int temp = SlotExtractor.extractInteger(t, -1);
+        if (temp >= 16 && temp <= 32) {
+            return temp;
         }
-        if (t.contains("اثنان وعشرون") || t.contains("ثنتين وعشرين") || t.contains("اثنين وعشرين")) return 22;
-        if (t.contains("عشرون") || t.contains("عشرين")) return 20;
-        if (t.contains("خمسه وعشرون") || t.contains("خمسة وعشرين")) return 25;
-        if (t.contains("واحد وعشرون") || t.contains("واحد وعشرين")) return 21;
-        if (t.contains("ثلاثه وعشرون") || t.contains("ثلاثة وعشرين")) return 23;
-        if (t.contains("اربعه وعشرون") || t.contains("اربعة وعشرين")) return 24;
         return null;
     }
 }
