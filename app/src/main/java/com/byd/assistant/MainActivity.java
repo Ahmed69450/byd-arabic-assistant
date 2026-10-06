@@ -11,10 +11,13 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.byd.assistant.service.AssistantForegroundService;
 import com.byd.assistant.updater.AppUpdateManager;
+
+import java.io.File;
 
 public class MainActivity extends Activity {
     private static final int REQ_RECORD_AUDIO = 201;
@@ -25,6 +28,7 @@ public class MainActivity extends Activity {
     private TextView versionTextView;
     private Button checkUpdateButton;
     private TextView updateStatusTextView;
+    private ProgressBar updateProgressBar;
     private boolean isServiceRunning = false;
 
     @Override
@@ -37,6 +41,7 @@ public class MainActivity extends Activity {
         versionTextView = findViewById(R.id.tv_version);
         checkUpdateButton = findViewById(R.id.btn_check_update);
         updateStatusTextView = findViewById(R.id.tv_update_status);
+        updateProgressBar = findViewById(R.id.pb_update_progress);
 
         initUpdateSection();
         checkPermissions();
@@ -75,8 +80,12 @@ public class MainActivity extends Activity {
     }
 
     private void triggerUpdateCheck() {
+        if (updateProgressBar != null) {
+            updateProgressBar.setVisibility(View.GONE);
+            updateProgressBar.setProgress(0);
+        }
         if (updateStatusTextView != null) {
-            updateStatusTextView.setText("جارٍ فحص التحديثات من GitHub...");
+            updateStatusTextView.setText("جارٍ التحقق من وجود تحديثات...");
         }
         if (checkUpdateButton != null) {
             checkUpdateButton.setEnabled(false);
@@ -131,16 +140,106 @@ public class MainActivity extends Activity {
         message.append("هل ترغب في تنزيل التحديث وتثبيته الآن؟");
 
         builder.setMessage(message.toString());
-        builder.setPositiveButton("تحميل وتثبيت الآن", (dialog, which) -> {
-            if (updateStatusTextView != null) {
-                updateStatusTextView.setText("جارٍ تنزيل ملف التحديث...");
-            }
-            Toast.makeText(MainActivity.this, "جارٍ بدء تحميل التحديث...", Toast.LENGTH_SHORT).show();
-            AppUpdateManager.downloadAndInstall(MainActivity.this, downloadUrl);
+        builder.setPositiveButton("تحديث الآن", (dialog, which) -> {
+            startApkDownload(downloadUrl);
         });
-        builder.setNegativeButton("لاحقاً", (dialog, which) -> dialog.dismiss());
+        builder.setNegativeButton("إلغاء", (dialog, which) -> dialog.dismiss());
         builder.setCancelable(true);
         builder.show();
+    }
+
+    private void startApkDownload(String downloadUrl) {
+        if (updateProgressBar != null) {
+            updateProgressBar.setVisibility(View.VISIBLE);
+            updateProgressBar.setProgress(0);
+        }
+        if (updateStatusTextView != null) {
+            updateStatusTextView.setText("جارٍ تنزيل التحديث (0%)...");
+        }
+        if (checkUpdateButton != null) {
+            checkUpdateButton.setEnabled(false);
+        }
+        Toast.makeText(this, "بدء تحميل التحديث...", Toast.LENGTH_SHORT).show();
+
+        File downloadDir = getExternalFilesDir(null);
+        if (downloadDir == null) {
+            downloadDir = getCacheDir();
+        }
+        File targetApk = new File(downloadDir, "byd_update.apk");
+
+        AppUpdateManager.downloadApk(downloadUrl, targetApk, new AppUpdateManager.DownloadCallback() {
+            @Override
+            public void onProgress(int percent) {
+                runOnUiThread(() -> {
+                    if (updateProgressBar != null) {
+                        updateProgressBar.setProgress(percent);
+                    }
+                    if (updateStatusTextView != null) {
+                        updateStatusTextView.setText("جارٍ تنزيل التحديث (" + percent + "%)...");
+                    }
+                });
+            }
+
+            @Override
+            public void onSuccess(File downloadedApk) {
+                runOnUiThread(() -> {
+                    if (updateProgressBar != null) {
+                        updateProgressBar.setVisibility(View.GONE);
+                    }
+                    if (checkUpdateButton != null) {
+                        checkUpdateButton.setEnabled(true);
+                    }
+                    if (updateStatusTextView != null) {
+                        updateStatusTextView.setText("تم تنزيل التحديث بنجاح، جارٍ التثبيت...");
+                    }
+                    Toast.makeText(MainActivity.this, "اكتمل التنزيل، جارٍ بدء التثبيت...", Toast.LENGTH_SHORT).show();
+                    triggerInstall(downloadedApk);
+                });
+            }
+
+            @Override
+            public void onError(String error) {
+                runOnUiThread(() -> {
+                    if (updateProgressBar != null) {
+                        updateProgressBar.setVisibility(View.GONE);
+                    }
+                    if (checkUpdateButton != null) {
+                        checkUpdateButton.setEnabled(true);
+                    }
+                    if (updateStatusTextView != null) {
+                        updateStatusTextView.setText("فشل تنزيل التحديث: " + error);
+                    }
+                    Toast.makeText(MainActivity.this, "فشل تنزيل التحديث: " + error, Toast.LENGTH_SHORT).show();
+                });
+            }
+        });
+    }
+
+    private void triggerInstall(File apkFile) {
+        if (apkFile == null || !apkFile.exists()) {
+            Toast.makeText(this, "ملف التحديث غير موجود", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (!getPackageManager().canRequestPackageInstalls()) {
+                    Intent permIntent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+                    permIntent.setData(Uri.parse("package:" + getPackageName()));
+                    startActivity(permIntent);
+                    Toast.makeText(this, "يرجى منح إذن تثبيت التطبيقات", Toast.LENGTH_LONG).show();
+                }
+            }
+
+            Intent installIntent = AppUpdateManager.createInstallIntent(
+                    this,
+                    apkFile,
+                    getPackageName() + ".provider"
+            );
+            startActivity(installIntent);
+        } catch (Exception e) {
+            Toast.makeText(this, "تعذر تشغيل مثبت الحزم: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
     private void checkPermissions() {

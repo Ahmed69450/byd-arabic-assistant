@@ -1,3 +1,12 @@
 <resources>
     <string name="app_name">مساعد BYD الصوتي</string>
+    <string name="btn_check_update">التحقق من التحديثات</string>
+    <string name="update_dialog_title">تحديث جديد متوفر</string>
+    <string name="update_dialog_update_now">تحديث الآن</string>
+    <string name="update_dialog_cancel">إلغاء</string>
+    <string name="update_status_checking">جارٍ التحقق من وجود تحديثات...</string>
+    <string name="update_status_up_to_date">أنت على أحدث إصدار!</string>
+    <string name="update_status_downloading">جارٍ تنزيل التحديث (%d%%)...</string>
+    <string name="update_status_download_complete">تم تنزيل التحديث بنجاح، جارٍ التثبيت...</string>
+    <string name="update_status_error">تعذر فحص التحديثات</string>
 </resources>
