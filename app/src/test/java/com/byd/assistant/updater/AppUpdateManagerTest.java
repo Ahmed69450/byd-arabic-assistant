@@ -10,6 +10,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -20,6 +22,8 @@ import java.util.concurrent.atomic.AtomicReference;
 public class AppUpdateManagerTest {
 
     public static void main(String[] args) throws Exception {
+        testUpdateUrlConstants();
+        testDistributionVersionJsonSchema();
         testVersionComparisons();
         testIsUpdateAvailable();
         testParseVersionJsonStandard();
@@ -27,7 +31,103 @@ public class AppUpdateManagerTest {
         testDownloadApkProgressCallbackSimulation();
         testDownloadApkErrorSimulation();
         testCreateInstallIntent();
+        testCheckForUpdatesSimulation();
         System.out.println("ALL_UPDATER_TESTS_PASSED");
+    }
+
+    private static void testUpdateUrlConstants() {
+        assertEquals("https://raw.githubusercontent.com/Ahmed69450/byd-voice-assistant-releases/main/version.json",
+                AppUpdateManager.UPDATE_URL, "UPDATE_URL constant mismatch");
+        assertEquals(AppUpdateManager.UPDATE_URL, AppUpdateManager.DEFAULT_VERSION_URL,
+                "DEFAULT_VERSION_URL should match UPDATE_URL");
+    }
+
+    private static void testDistributionVersionJsonSchema() throws IOException {
+        File distFile = new File("distribution/version.json");
+        if (!distFile.exists()) {
+            distFile = new File("../distribution/version.json");
+        }
+        assertTrue(distFile.exists(), "distribution/version.json file not found");
+        String content = new String(Files.readAllBytes(distFile.toPath()), "UTF-8");
+        AppUpdateManager.UpdateInfo info = AppUpdateManager.parseVersionJson(content);
+
+        assertNotNull(info, "Parsed distribution/version.json should not be null");
+        assertEquals(200, info.getVersionCode(), "versionCode should be 200");
+        assertEquals("2.0.0", info.getVersionName(), "versionName should be 2.0.0");
+        assertEquals("https://github.com/Ahmed69450/byd-voice-assistant-releases/releases/latest/download/assistant-release.apk",
+                info.getApkUrl(), "apkUrl should match release binary URL");
+        assertTrue(info.getChangelog().contains("مساعد صوتي محلي بالكامل للسيارات"), "changelog missing key phrase");
+        assertTrue(info.getChangelog().contains("Home Assistant"), "changelog missing Home Assistant support");
+        assertEquals(100, info.getMinAppVersion(), "minAppVersion should be 100");
+
+        // Verify update detection
+        assertTrue(AppUpdateManager.isUpdateAvailable(5, info), "Installed version 5 should detect update 200");
+        assertTrue(AppUpdateManager.isUpdateAvailable(100, info), "Installed version 100 should detect update 200");
+        assertFalse(AppUpdateManager.isUpdateAvailable(200, info), "Installed version 200 should not detect update 200");
+    }
+
+    private static void testCheckForUpdatesSimulation() throws Exception {
+        String testJson = "{\n" +
+                "  \"versionCode\": 200,\n" +
+                "  \"versionName\": \"2.0.0\",\n" +
+                "  \"apkUrl\": \"https://github.com/Ahmed69450/byd-voice-assistant-releases/releases/latest/download/assistant-release.apk\",\n" +
+                "  \"changelog\": \"مساعد صوتي محلي بالكامل للسيارات\",\n" +
+                "  \"minAppVersion\": 100\n" +
+                "}";
+
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/version.json", new HttpHandler() {
+            @Override
+            public void handle(HttpExchange exchange) throws IOException {
+                byte[] bytes = testJson.getBytes("UTF-8");
+                exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+                exchange.sendResponseHeaders(200, bytes.length);
+                OutputStream os = exchange.getResponseBody();
+                os.write(bytes);
+                os.close();
+            }
+        });
+        server.start();
+
+        int port = server.getAddress().getPort();
+        String updateUrl = "http://127.0.0.1:" + port + "/version.json";
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> tagRef = new AtomicReference<>(null);
+        AtomicReference<String> urlRef = new AtomicReference<>(null);
+        AtomicReference<String> notesRef = new AtomicReference<>(null);
+        AtomicReference<String> errRef = new AtomicReference<>(null);
+
+        AppUpdateManager.checkForUpdates(null, updateUrl, new AppUpdateManager.UpdateCallback() {
+            @Override
+            public void onUpdateAvailable(String latestVersion, String downloadUrl, String releaseNotes) {
+                tagRef.set(latestVersion);
+                urlRef.set(downloadUrl);
+                notesRef.set(releaseNotes);
+                latch.countDown();
+            }
+
+            @Override
+            public void onUpToDate(String currentVersion) {
+                latch.countDown();
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                errRef.set(errorMessage);
+                latch.countDown();
+            }
+        });
+
+        boolean finished = latch.await(5, TimeUnit.SECONDS);
+        server.stop(0);
+
+        assertTrue(finished, "checkForUpdates simulation timed out");
+        assertNull(errRef.get(), "checkForUpdates reported error: " + errRef.get());
+        assertEquals("2.0.0", tagRef.get(), "Reported version mismatch");
+        assertEquals("https://github.com/Ahmed69450/byd-voice-assistant-releases/releases/latest/download/assistant-release.apk",
+                urlRef.get(), "Reported apkUrl mismatch");
+        assertTrue(notesRef.get().contains("مساعد صوتي محلي"), "Reported notes mismatch");
     }
 
     private static void testVersionComparisons() {

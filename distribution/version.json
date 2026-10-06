@@ -1,0 +1,7 @@
+{
+  "versionCode": 200,
+  "versionName": "2.0.0",
+  "apkUrl": "https://github.com/Ahmed69450/byd-voice-assistant-releases/releases/latest/download/assistant-release.apk",
+  "changelog": "إصدار 2.0.0: مساعد صوتي محلي بالكامل للسيارات، تحكم بالتكييف والنوافذ والإضاءة المحيطية، ودعم Home Assistant، والتحقق التلقائي من التحديثات داخل التطبيق.",
+  "minAppVersion": 100
+}

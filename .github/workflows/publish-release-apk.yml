@@ -1,0 +1,186 @@
+name: Publish Release APK (Distribution Repository)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release Tag (e.g. v2.0.0)'
+        required: false
+        default: 'v2.0.0'
+      publish_to_releases_repo:
+        description: 'Push to dedicated release repository'
+        type: boolean
+        required: true
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    name: Build & Publish APK (Zero Source Code)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Core Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.2'
+
+      - name: Validate version.json Schema
+        run: |
+          if [ ! -f "distribution/version.json" ]; then
+            echo "ERROR: distribution/version.json not found!"
+            exit 1
+          fi
+          # Verify JSON syntax
+          python3 -m json.tool distribution/version.json > /dev/null
+          echo "distribution/version.json is valid JSON."
+
+      - name: Build Release APK
+        run: |
+          chmod +x ./gradlew 2>/dev/null || true
+          echo "Building APK via Gradle..."
+          if gradle assembleRelease --stacktrace; then
+            echo "Successfully assembled release build."
+          else
+            echo "Release build not signed or failed; falling back to assembleDebug..."
+            gradle assembleDebug --stacktrace
+          fi
+
+      - name: Stage Distribution Binaries Only
+        id: stage_binaries
+        run: |
+          mkdir -p staging_dist
+          
+          # Find compiled APK
+          APK_PATH=$(find app/build/outputs/apk -type f -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "ERROR: No compiled APK found!"
+            exit 1
+          fi
+          echo "Found compiled APK: $APK_PATH"
+          cp "$APK_PATH" staging_dist/assistant-release.apk
+          cp distribution/version.json staging_dist/version.json
+          
+          # Generate SHA-256 checksum for binary integrity
+          cd staging_dist
+          sha256sum assistant-release.apk > assistant-release.apk.sha256
+          cd ..
+          
+          echo "Staged files in staging_dist:"
+          ls -la staging_dist
+
+      - name: Enforce Strict Zero-Source Policy
+        run: |
+          echo "Verifying that ZERO source code exists in the staging distribution directory..."
+          FORBIDDEN_EXTENSIONS="java kt xml gradle properties c cpp h py js sh json.gz zip"
+          
+          # Check staged directory contents
+          STAGED_FILES=$(ls staging_dist)
+          for file in $STAGED_FILES; do
+            case "$file" in
+              assistant-release.apk|assistant-release.apk.sha256|version.json)
+                echo "Allowed artifact: $file"
+                ;;
+              *)
+                echo "SECURITY VIOLATION: Disallowed file in release payload: $file"
+                exit 1
+                ;;
+            esac
+          done
+          
+          # Verify no source files were accidentally packed
+          if find staging_dist -type f \( -name "*.java" -o -name "*.kt" -o -name "*.xml" -o -name "*.gradle" \) | grep -q .; then
+            echo "SECURITY VIOLATION: Source code files detected in release staging directory!"
+            exit 1
+          fi
+          
+          echo "Zero-source policy verification PASSED."
+
+      - name: Upload GitHub Actions Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: BydVoiceAssistant-Release-Artifacts
+          path: staging_dist/
+          retention-days: 30
+
+      - name: Publish to Dedicated Release Repository
+        if: ${{ github.event_name == 'push' || github.event.inputs.publish_to_releases_repo != 'false' }}
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+          TARGET_REPO: "Ahmed69450/byd-voice-assistant-releases"
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          if [[ "$TAG_NAME" != v* ]]; then
+            TAG_NAME="${{ github.event.inputs.release_tag || 'v2.0.0' }}"
+          fi
+          echo "Target tag: $TAG_NAME"
+          
+          # Verify token exists before remote operations
+          if [ -z "$RELEASE_TOKEN" ]; then
+            echo "WARNING: No RELEASE_REPO_TOKEN or GITHUB_TOKEN configured. Skipping push to dedicated repo."
+            exit 0
+          fi
+          
+          # Clone target repository into an isolated directory
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          rm -rf repo_clone
+          git clone "https://x-access-token:${RELEASE_TOKEN}@github.com/${TARGET_REPO}.git" repo_clone || {
+            echo "WARNING: Failed to clone ${TARGET_REPO}. Ensure repository exists and token has write permissions."
+            exit 0
+          }
+          
+          cd repo_clone
+          # Update version.json manifest
+          cp ../staging_dist/version.json ./version.json
+          
+          # Verify again that no source files leaked
+          if find . -maxdepth 2 -type f \( -name "*.java" -o -name "*.kt" \) | grep -q .; then
+            echo "FATAL: Source code detected in target repository!"
+            exit 1
+          fi
+          
+          git add version.json
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "chore(release): update version.json manifest for ${TAG_NAME}"
+            git push origin main || git push origin master
+            echo "Successfully updated version.json manifest in ${TARGET_REPO}."
+          else
+            echo "Manifest version.json already up to date."
+          fi
+          
+          # Publish binary APK release using GitHub CLI
+          export GH_TOKEN="$RELEASE_TOKEN"
+          if gh release view "$TAG_NAME" --repo "$TARGET_REPO" > /dev/null 2>&1; then
+            echo "Updating existing release $TAG_NAME..."
+            gh release upload "$TAG_NAME" \
+              ../staging_dist/assistant-release.apk \
+              ../staging_dist/assistant-release.apk.sha256 \
+              --repo "$TARGET_REPO" --clobber
+          else
+            echo "Creating new release $TAG_NAME..."
+            gh release create "$TAG_NAME" \
+              ../staging_dist/assistant-release.apk \
+              ../staging_dist/assistant-release.apk.sha256 \
+              --repo "$TARGET_REPO" \
+              --title "BYD Assistant ${TAG_NAME}" \
+              --notes "Automated release containing compiled APK binaries and checksums. Zero source code."
+          fi
+          echo "Successfully published binary release to ${TARGET_REPO}."

@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -19,8 +20,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class AppUpdateManager {
+    public static final String UPDATE_URL = "https://raw.githubusercontent.com/Ahmed69450/byd-voice-assistant-releases/main/version.json";
+    public static final String DEFAULT_VERSION_URL = UPDATE_URL;
     public static final String GITHUB_API_URL = "https://api.github.com/repos/Ahmed69450/byd-arabic-assistant/releases/latest";
-    public static final String DEFAULT_VERSION_URL = "https://raw.githubusercontent.com/Ahmed69450/byd-voice-assistant-releases/main/version.json";
 
     public static class UpdateInfo {
         public int versionCode;
@@ -252,9 +254,14 @@ public class AppUpdateManager {
     }
 
     public static void checkForUpdates(Object context, UpdateCallback callback) {
+        checkForUpdates(context, UPDATE_URL, callback);
+    }
+
+    public static void checkForUpdates(Object context, String updateUrl, UpdateCallback callback) {
         new Thread(() -> {
             try {
-                URL url = new URL(GITHUB_API_URL);
+                String targetUrl = (updateUrl != null && !updateUrl.trim().isEmpty()) ? updateUrl : UPDATE_URL;
+                URL url = new URL(targetUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
                 conn.setRequestProperty("User-Agent", "BYD-Arabic-Assistant-App");
@@ -263,11 +270,11 @@ public class AppUpdateManager {
 
                 int responseCode = conn.getResponseCode();
                 if (responseCode != 200) {
-                    postError(callback, "فشل الاتصال بـ GitHub (كود: " + responseCode + ")");
+                    postError(callback, "فشل الاتصال بالخادم (كود: " + responseCode + ")");
                     return;
                 }
 
-                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
                 StringBuilder sb = new StringBuilder();
                 String line;
                 while ((line = reader.readLine()) != null) {
