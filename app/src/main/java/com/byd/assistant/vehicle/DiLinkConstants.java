@@ -17,4 +17,20 @@ public final class DiLinkConstants {
     // Broadcast Fallbacks
     public static final String ACTION_AC_CONTROL = "byd.intent.action.AC_CONTROL";
     public static final String ACTION_WINDOW_CONTROL = "byd.intent.action.WINDOW_CONTROL";
+
+    // Ambient Lighting Broadcast Actions & Extras
+    public static final String ACTION_SET_AMBIENT_LIGHT = "com.byd.intent.action.SET_AMBIENT_LIGHT";
+    public static final String EXTRA_LIGHT_COLOR = "color";
+    public static final String EXTRA_LIGHT_BRIGHTNESS = "brightness";
+    public static final String EXTRA_LIGHT_ENABLED = "enabled";
+
+    // HVAC Extras for Fan Speed and Air Recirculation
+    public static final String EXTRA_AC_RECIRCULATION = "recirculation";
+    public static final String EXTRA_AC_FAN_SPEED = "fan_speed";
+
+    // Window Ventilation Actions & Modes
+    public static final String ACTION_WINDOW_VENT = "com.byd.intent.action.WINDOW_VENT";
+    public static final String EXTRA_WINDOW_MODE = "mode";
+    public static final String EXTRA_WINDOW_POSITION = "position";
+    public static final String MODE_VENTILATION = "ventilation";
 }

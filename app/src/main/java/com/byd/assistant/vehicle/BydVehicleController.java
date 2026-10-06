@@ -2,6 +2,8 @@ package com.byd.assistant.vehicle;
 
 import com.byd.assistant.model.*;
 import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.Map;
 
 public class BydVehicleController {
     private final Object androidContext;
@@ -29,7 +31,11 @@ public class BydVehicleController {
             return rotateScreen(((VehicleIntent.ScreenRotate) intent).orientation);
         } else if (intent instanceof VehicleIntent.Climate) {
             VehicleIntent.Climate c = (VehicleIntent.Climate) intent;
-            return setClimate(c.enabled, c.targetTemp);
+            boolean res = setClimate(c.enabled, c.targetTemp);
+            if (c.fanSpeed != null) {
+                res = setFanSpeed(c.fanSpeed) && res;
+            }
+            return res;
         } else if (intent instanceof VehicleIntent.Window) {
             VehicleIntent.Window w = (VehicleIntent.Window) intent;
             return setWindow(w.open, w.targetWindow);
@@ -41,6 +47,9 @@ public class BydVehicleController {
             return controlMedia(((VehicleIntent.Media) intent).action);
         } else if (intent instanceof VehicleIntent.OpenApp) {
             return launchApplication(((VehicleIntent.OpenApp) intent).appName);
+        } else if (intent instanceof LightingIntent) {
+            LightingIntent l = (LightingIntent) intent;
+            return setAmbientLightColor(l.getColorName(), l.getBrightness());
         }
 
         return false;
@@ -289,6 +298,139 @@ public class BydVehicleController {
         }
     }
 
+    public boolean setAmbientLightColor(String colorName, int brightness) {
+        if (isMockMode || androidContext == null) {
+            return true;
+        }
+
+        try {
+            int clampedBrightness = Math.max(0, Math.min(100, brightness));
+            boolean enabled = clampedBrightness > 0;
+
+            // 1. Try DiLink body service reflection
+            Object bodyService = getDiLinkService(DiLinkConstants.SERVICE_BYD_BODY);
+            if (bodyService != null) {
+                try {
+                    Method lightMethod = bodyService.getClass().getMethod("setAmbientLight", String.class, int.class, boolean.class);
+                    lightMethod.invoke(bodyService, colorName, clampedBrightness, enabled);
+                    return true;
+                } catch (Throwable ignored) {}
+            }
+
+            // 2. Broadcast fallback
+            Map<String, Object> extras = new HashMap<>();
+            extras.put(DiLinkConstants.EXTRA_LIGHT_COLOR, colorName != null ? colorName : "أبيض");
+            extras.put(DiLinkConstants.EXTRA_LIGHT_BRIGHTNESS, clampedBrightness);
+            extras.put(DiLinkConstants.EXTRA_LIGHT_ENABLED, enabled);
+            sendBroadcast(DiLinkConstants.ACTION_SET_AMBIENT_LIGHT, extras);
+            return true;
+        } catch (Throwable e) {
+            return false;
+        }
+    }
+
+    public boolean setFanSpeed(int speed) {
+        if (isMockMode || androidContext == null) {
+            return true;
+        }
+
+        try {
+            int clamped = Math.max(1, Math.min(7, speed));
+            Object airService = getDiLinkService(DiLinkConstants.SERVICE_BYD_AIR);
+            if (airService != null) {
+                try {
+                    Method fanMethod = airService.getClass().getMethod("setFanSpeed", int.class);
+                    fanMethod.invoke(airService, clamped);
+                    return true;
+                } catch (Throwable ignored) {}
+            }
+
+            Map<String, Object> extras = new HashMap<>();
+            extras.put(DiLinkConstants.EXTRA_AC_FAN_SPEED, clamped);
+            sendBroadcast(DiLinkConstants.ACTION_AC_CONTROL, extras);
+            return true;
+        } catch (Throwable e) {
+            return false;
+        }
+    }
+
+    public boolean setRecirculation(boolean internal) {
+        if (isMockMode || androidContext == null) {
+            return true;
+        }
+
+        try {
+            Object airService = getDiLinkService(DiLinkConstants.SERVICE_BYD_AIR);
+            if (airService != null) {
+                try {
+                    Method recircMethod = airService.getClass().getMethod("setRecirculation", boolean.class);
+                    recircMethod.invoke(airService, internal);
+                    return true;
+                } catch (Throwable ignored) {}
+            }
+
+            Map<String, Object> extras = new HashMap<>();
+            extras.put(DiLinkConstants.EXTRA_AC_RECIRCULATION, internal);
+            sendBroadcast(DiLinkConstants.ACTION_AC_CONTROL, extras);
+            return true;
+        } catch (Throwable e) {
+            return false;
+        }
+    }
+
+    public boolean ventWindows() {
+        if (isMockMode || androidContext == null) {
+            return true;
+        }
+
+        try {
+            Object windowService = getDiLinkService(DiLinkConstants.SERVICE_BYD_WINDOW);
+            if (windowService != null) {
+                try {
+                    Method ventMethod = windowService.getClass().getMethod("ventWindows", int.class);
+                    ventMethod.invoke(windowService, 15);
+                    return true;
+                } catch (Throwable ignored) {}
+            }
+
+            Map<String, Object> extras = new HashMap<>();
+            extras.put(DiLinkConstants.EXTRA_WINDOW_MODE, DiLinkConstants.MODE_VENTILATION);
+            extras.put(DiLinkConstants.EXTRA_WINDOW_POSITION, 15);
+            sendBroadcast(DiLinkConstants.ACTION_WINDOW_VENT, extras);
+            return true;
+        } catch (Throwable e) {
+            return false;
+        }
+    }
+
+    public TelemetryData getVehicleTelemetry() {
+        if (isMockMode || androidContext == null) {
+            return new TelemetryData();
+        }
+
+        try {
+            Object bodyService = getDiLinkService(DiLinkConstants.SERVICE_BYD_BODY);
+            if (bodyService != null) {
+                try {
+                    Method getSocMethod = bodyService.getClass().getMethod("getBatterySoc");
+                    int soc = (Integer) getSocMethod.invoke(bodyService);
+                    Method getRangeMethod = bodyService.getClass().getMethod("getRemainingRangeKm");
+                    int range = (Integer) getRangeMethod.invoke(bodyService);
+                    Method getFuelMethod = bodyService.getClass().getMethod("getFuelLevel");
+                    int fuel = (Integer) getFuelMethod.invoke(bodyService);
+                    Method getDtcMethod = bodyService.getClass().getMethod("hasDtcFault");
+                    boolean fault = (Boolean) getDtcMethod.invoke(bodyService);
+                    Method getDtcMsg = bodyService.getClass().getMethod("getDiagnosticSummary");
+                    String msg = (String) getDtcMsg.invoke(bodyService);
+                    return new TelemetryData(soc, range, fuel, fault, msg);
+                } catch (Throwable ignored) {}
+            }
+            return new TelemetryData();
+        } catch (Throwable e) {
+            return new TelemetryData();
+        }
+    }
+
     private Object getDiLinkService(String serviceName) {
         try {
             Class<?> smClass = Class.forName("android.os.ServiceManager");
@@ -300,6 +442,7 @@ public class BydVehicleController {
     }
 
     private void sendBroadcast(String action, String extraKey, Object extraVal) {
+        if (androidContext == null) return;
         try {
             Class<?> intentClass = Class.forName("android.content.Intent");
             Object intent = intentClass.getConstructor(String.class).newInstance(action);
@@ -310,6 +453,36 @@ public class BydVehicleController {
                 } else if (extraVal instanceof Boolean) {
                     Method putExtra = intentClass.getMethod("putExtra", String.class, boolean.class);
                     putExtra.invoke(intent, extraKey, (Boolean) extraVal);
+                } else if (extraVal instanceof String) {
+                    Method putExtra = intentClass.getMethod("putExtra", String.class, String.class);
+                    putExtra.invoke(intent, extraKey, (String) extraVal);
+                }
+            }
+            Class<?> contextClass = Class.forName("android.content.Context");
+            Method sendBroadcast = contextClass.getMethod("sendBroadcast", intentClass);
+            sendBroadcast.invoke(androidContext, intent);
+        } catch (Throwable ignored) {}
+    }
+
+    private void sendBroadcast(String action, Map<String, Object> extras) {
+        if (androidContext == null) return;
+        try {
+            Class<?> intentClass = Class.forName("android.content.Intent");
+            Object intent = intentClass.getConstructor(String.class).newInstance(action);
+            if (extras != null) {
+                for (Map.Entry<String, Object> entry : extras.entrySet()) {
+                    String k = entry.getKey();
+                    Object v = entry.getValue();
+                    if (v instanceof Integer) {
+                        Method putExtra = intentClass.getMethod("putExtra", String.class, int.class);
+                        putExtra.invoke(intent, k, (Integer) v);
+                    } else if (v instanceof Boolean) {
+                        Method putExtra = intentClass.getMethod("putExtra", String.class, boolean.class);
+                        putExtra.invoke(intent, k, (Boolean) v);
+                    } else if (v instanceof String) {
+                        Method putExtra = intentClass.getMethod("putExtra", String.class, String.class);
+                        putExtra.invoke(intent, k, (String) v);
+                    }
                 }
             }
             Class<?> contextClass = Class.forName("android.content.Context");
@@ -319,6 +492,7 @@ public class BydVehicleController {
     }
 
     private void sendAcBroadcast(boolean enabled, Integer targetTemp) {
+        if (androidContext == null) return;
         try {
             Class<?> intentClass = Class.forName("android.content.Intent");
             Object intent = intentClass.getConstructor(String.class).newInstance(DiLinkConstants.ACTION_AC_CONTROL);
