@@ -1,3 +1,11 @@
 
 .worktrees/
+*.apk
+*.zip
+bin/
+target/
+.gradle/
+build/
+app/build/
+
 
